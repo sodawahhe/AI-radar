@@ -1,0 +1,107 @@
+# Watchlist — GitHub 技能雷达的采集范围
+# 规格来源：PROJECT_SPEC_V2.md §3.2
+#
+# 三个来源合并去重后构成 watchlist：
+#   1. seeds（本文件，手动种子，无上限）
+#   2. trending 页抓取（daily + weekly，各每次新增上限 50）
+#   3. Search API 按 topic_queries 轮询（每 topic 每次新增上限 30）
+#
+# Phase 0 阶段：collect_github.py 只使用 seeds，不抓 trending / topic 查询。
+# seeds 覆盖 config/scoring.yaml 中 relevance_keywords 的各个类别，
+# 并混入本次调研中发现的高增速新仓库，用于验证打分公式的区分度。
+
+seeds:
+  # --- 数据科学 / ML 核心 ---
+  - pandas-dev/pandas
+  - pola-rs/polars
+  - scikit-learn/scikit-learn
+  - pytorch/pytorch
+  - numpy/numpy
+  - scipy/scipy
+  - statsmodels/statsmodels
+  - duckdb/duckdb
+  - dbt-labs/dbt-core
+  - apache/superset
+  - plotly/plotly.py
+  - streamlit/streamlit
+  - gradio-app/gradio
+  - jupyterlab/jupyterlab
+  - matplotlib/matplotlib
+  - d3/d3
+  - observablehq/plot
+
+  # --- MLOps / 数据工程 ---
+  - mlflow/mlflow
+  - iterative/dvc
+  - feast-dev/feast
+  - great-expectations/great_expectations
+  - apache/airflow
+  - dagster-io/dagster
+  - prefecthq/prefect
+  - apache/spark
+  - ray-project/ray
+
+  # --- LLM / Agent / RAG ---
+  - langchain-ai/langchain
+  - run-llama/llama_index
+  - openai/openai-python
+  - anthropics/anthropic-sdk-python
+  - anthropics/claude-code
+  - ollama/ollama
+  - ggml-org/llama.cpp
+  - vllm-project/vllm
+  - huggingface/transformers
+  - huggingface/datasets
+  - chroma-core/chroma
+  - qdrant/qdrant
+  - weaviate/weaviate
+  - microsoft/autogen
+  - crewAIInc/crewAI
+  - BerriAI/litellm
+
+  # --- 评测 / Benchmark ---
+  - openai/evals
+  - explodinggradients/ragas
+  - confident-ai/deepeval
+
+  # --- 开发者工具（career 相关） ---
+  - astral-sh/uv
+  - astral-sh/ruff
+
+  # --- 本次调研中发现的高增速新仓库（用于验证打分区分度） ---
+  - cloudflare/computer
+  - cactus-compute/needle
+  - NVIDIA-NeMo/Switchyard
+  - PrimeIntellect-ai/prime-agent
+  - vitali87/code-graph-rag
+
+# Phase 1+ 才启用：Search API topic 轮询
+# 查询式：topic:{t} stars:>500 pushed:>{today-7d}
+topic_queries:
+  topics:
+    - ai-agents
+    - llm
+    - mcp
+    - machine-learning
+    - data-science
+    - data-engineering
+    - mlops
+    - llmops
+    - rag
+    - visualization
+  min_stars: 500
+  pushed_within_days: 7
+  max_new_per_topic: 30
+
+# Phase 1+ 才启用：trending 页抓取
+trending:
+  enabled: false
+  windows: [daily, weekly]
+  max_new_per_window: 50
+
+# 淘汰规则（§3.2）：
+# 连续 60 天 score 未进入过 Top 50 且 90 天无提交 → 移出 watchlist
+eviction:
+  days_outside_top50: 60
+  days_since_push: 90
+  top_n: 50

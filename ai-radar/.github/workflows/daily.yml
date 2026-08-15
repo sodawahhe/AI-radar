@@ -1,0 +1,45 @@
+name: AI Radar Daily
+
+# 规格来源：PROJECT_SPEC_V2.md §0（工作日每天 08:30 北京时间）§7（可靠性）
+#
+# 08:30 北京时间（UTC+8）= 00:30 UTC。cron 的 weekday 字段 1-5 = 周一到周五。
+on:
+  schedule:
+    - cron: "30 0 * * 1-5"
+  workflow_dispatch: {} # 允许在 Actions 页面手动点一下按钮立即跑一次，用于测试
+
+permissions:
+  contents: write # 需要写权限才能把快照/报告提交回仓库（§7 的心跳机制）
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-radar
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Collect, score, and send email
+        env:
+          # GITHUB_TOKEN 由 Actions 自动提供，认证后额度 5000 次/小时，无需手动配置
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 下面两个需要你在仓库 Settings → Secrets and variables → Actions 里手动添加
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python run_daily.py
+
+      - name: Commit snapshot (state + heartbeat + keepalive, §7)
+        run: |
+          git config user.name "ai-radar-bot"
+          git config user.email "actions@github.com"
+          git add data/ reports/
+          git diff --cached --quiet || git commit -m "radar: $(date -u +%Y-%m-%d)"
+          git push

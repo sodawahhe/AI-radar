@@ -1,0 +1,135 @@
+# 打分权重 / 完整性闸门阈值 / 相关性关键词表
+# 规格来源：PROJECT_SPEC_V2.md §3.4 §3.5 §3.6 §6.1
+#
+# 修改本文件不需要改代码。跑满两周后按实际点开情况调一次，之后每季度调一次。
+
+# --- §3.4 打分公式权重 ---
+weights:
+  momentum: 0.40    # 归一化增速：star_growth_7d / sqrt(stars)
+  adoption: 0.25     # log1p(forks) + log1p(contributors) + log1p(releases_90d)
+  freshness: 0.15    # 0.5 ** (days_since_push / half_life_days)
+  relevance: 0.20    # 关键词命中加权和
+
+freshness_half_life_days: 14
+
+# --- §3.5 完整性闸门（硬性否决，非加权，在打分之前执行） ---
+integrity_gate:
+  suspected_inflation:
+    min_stars: 5000
+    max_fork_star_ratio: 0.01
+    action: exclude
+    reason: suspected_star_inflation
+
+  template_not_software:
+    min_fork_star_ratio: 0.40
+    exempt_min_age_days: 1825  # 5 年。见下方 2026-08-15 实测发现
+    action: demote_to_template_section
+    reason: template_not_software
+
+  young_and_huge:
+    max_age_days: 30
+    min_stars: 20000
+    action: flag_for_manual_review
+    reason: young_and_huge
+
+  single_maintainer:
+    min_stars: 10000
+    max_contributors: 2
+    score_multiplier: 0.5
+    reason: single_maintainer
+
+  abandoned:
+    min_days_since_push: 90
+    max_releases_total: 0
+    action: exclude
+    reason: abandoned
+
+  no_license:
+    score_multiplier: 0.7
+    reason: no_license
+
+# --- §3.5 实测依据（用于 tests/test_score.py 断言，勿删） ---
+# odysseus-dev/odysseus   stars=85390 forks=458    fork_star=0.005  -> EXCLUDE (suspected_inflation)
+# ultraworkers/claw-code  stars=195047 forks=109123 fork_star=0.56  -> DEMOTE  (template_not_software)
+# cloudflare/computer     stars=8160                                -> PASS
+#
+# --- 2026-08-15 Phase 0 首次真实数据测试发现，已修复 ---
+# pandas-dev/pandas（存在 17 年）stars=49501 forks=20267 fork_star=0.409
+# 曾被 template_not_software 误判为"模板仓库"。原因：老牌经典项目经年累月
+# 被大量正当复制（贡献代码/学习/试验），复制率天然偏高，这与"模板仓库被
+# 短期内大量复制去改改就用"的复制率偏高是同一个数字、不同的成因，
+# 原规则无法区分。修复：加 exempt_min_age_days，超过 5 年的仓库不适用
+# 本条规则——真正的模板仓库通常是近一两年内出现的新现象。
+
+# --- §3.6 相关性关键词表 ---
+relevance_keywords:
+  high:     # 权重 3.0 —— 直接对应课程与求职方向
+    weight: 3.0
+    terms:
+      - python
+      - pandas
+      - polars
+      - sql
+      - dbt
+      - scikit-learn
+      - pytorch
+      - statistics
+      - causal-inference
+      - experimentation
+      - ab-testing
+      - visualization
+      - d3
+      - notebook
+      - jupyter
+      - feature-store
+      - mlops
+      - data-quality
+
+  medium:   # 权重 1.5 —— 生态基础设施
+    weight: 1.5
+    terms:
+      - llm
+      - rag
+      - embedding
+      - vector
+      - agent
+      - mcp
+      - evaluation
+      - benchmark
+      - inference
+      - quantization
+      - fine-tuning
+      - orchestration
+
+  low:      # 权重 0.5 —— 相关但不直接可用
+    weight: 0.5
+    terms:
+      - gpu
+      - cuda
+      - kubernetes
+      - serving
+      - distributed
+
+  negative: # 权重 -2.0 —— 明确不感兴趣
+    weight: -2.0
+    terms:
+      - blockchain
+      - web3
+      - nft
+      - trading-bot
+      - game-engine
+      - minecraft
+
+# --- §2.4 硬性配额 ---
+quotas:
+  vendor_change_max: 3
+  must_know_max: 3
+  worth_knowing_max: 4
+  skill_radar_max: 3
+  watchlist_max: 3
+
+# --- §6.1 静默日阈值（初始值，两周后校准） ---
+silent_threshold: 0.55
+
+# readme 截断长度（供 relevance 抓取用，§3.4）
+readme_snippet_chars: 500
