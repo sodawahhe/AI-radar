@@ -110,6 +110,57 @@ def build_memory_db(snapshots_dir: Path, dates: Iterable[str] | None = None) -> 
     return conn
 
 
+def seen_path(seen_dir: Path, snapshot_date: str) -> Path:
+    return seen_dir / f"{snapshot_date}.jsonl"
+
+
+def write_seen(seen_dir: Path, snapshot_date: str, hashes: Iterable[str]) -> Path:
+    """把当天推送过的标题哈希写入 data/seen/YYYY-MM-DD.jsonl，供之后
+    read_recent_seen_hashes() 做跨天去重（改造计划 §四）。整体覆盖写，
+    同一天内多次运行以最后一次为准，行为与 write_snapshot() 一致。"""
+    seen_dir.mkdir(parents=True, exist_ok=True)
+    path = seen_path(seen_dir, snapshot_date)
+    with path.open("w", encoding="utf-8") as f:
+        for h in hashes:
+            f.write(json.dumps({"hash": h}, ensure_ascii=False) + "\n")
+    return path
+
+
+def read_recent_seen_hashes(seen_dir: Path, as_of: date, lookback_days: int = 7) -> set[str]:
+    """读取最近 lookback_days 天（不含 as_of 当天，因为当天还没写过）已推送
+    条目的标题哈希，用于跨天去重——防止同一条新闻连续多天出现在简报里。
+    目录或文件不存在时返回空集合，调用方无需做存在性判断。"""
+    hashes: set[str] = set()
+    if not seen_dir.exists():
+        return hashes
+    for i in range(1, lookback_days + 1):
+        d = (as_of - timedelta(days=i)).isoformat()
+        path = seen_path(seen_dir, d)
+        if not path.exists():
+            continue
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    hashes.add(json.loads(line)["hash"])
+    return hashes
+
+
+def prune_old_seen(seen_dir: Path, as_of: date, keep_days: int = 7) -> None:
+    """删除超过 keep_days 天的 seen 文件，避免目录无限增长
+    （改造计划 §二：data/seen/ 只保留 7 天）。"""
+    if not seen_dir.exists():
+        return
+    cutoff = as_of - timedelta(days=keep_days)
+    for path in seen_dir.glob("*.jsonl"):
+        try:
+            file_date = date.fromisoformat(path.stem)
+        except ValueError:
+            continue
+        if file_date < cutoff:
+            path.unlink()
+
+
 def star_growth(
     conn: sqlite3.Connection,
     full_name: str,

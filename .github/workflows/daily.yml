@@ -1,11 +1,17 @@
 name: AI Radar Daily
 
-# 规格来源：PROJECT_SPEC_V2.md §0（工作日每天 08:30 北京时间）§7（可靠性）
+# 规格来源：daimonia-trends-radar 改造计划（每天 07:30 北京时间左右，含周末）§7（可靠性）
 #
-# 08:30 北京时间（UTC+8）= 00:30 UTC。cron 的 weekday 字段 1-5 = 周一到周五。
+# 05:45 北京时间（UTC+8）= 21:45 UTC（前一天）。DeepSeek 高峰时段是 UTC
+# 01:00–04:00 与 06:00–10:00（PROJECT_SPEC_V2.md §8），21:45 UTC 距离
+# 01:00 UTC 高峰开始还有 3 小时 15 分钟缓冲——GitHub Actions 的 schedule
+# 触发不保证准点，官方文档明确说整点前后是高负载时段更容易延迟，所以这里
+# 特意避开整点分钟数，并留了半天里最宽的非高峰窗口（10:00 UTC ~ 次日 01:00
+# UTC）中间偏后的位置，扛得住典型的调度延迟。不限定工作日——资讯简报周末
+# 照样有新闻，不像旧的技能雷达管道那样只在工作日跑。
 on:
   schedule:
-    - cron: "30 0 * * 1-5"
+    - cron: "45 21 * * *"
   workflow_dispatch: {} # 允许在 Actions 页面手动点一下按钮立即跑一次，用于测试
 
 permissions:
@@ -27,13 +33,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Collect, score, and send email
+      - name: Collect, rank, summarize, and send email
         env:
           # GITHUB_TOKEN 由 Actions 自动提供，认证后额度 5000 次/小时，无需手动配置
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 下面两个需要你在仓库 Settings → Secrets and variables → Actions 里手动添加
+          # 下面三个需要你在仓库 Settings → Secrets and variables → Actions 里手动添加
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          # 缺失时 summarize.py 自动降级为原文摘要，不阻塞发信（见 src/summarize.py）
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: python run_daily.py
 
       - name: Commit snapshot (state + heartbeat + keepalive, §7)

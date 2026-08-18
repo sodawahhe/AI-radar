@@ -1,0 +1,12 @@
+# AI 每日简报 —— LLM 摘要配置
+# 规格来源：daimonia-trends-radar 改造计划 §四 5
+#
+# provider: none 时 summarize.py 跳过 LLM 调用，直接用原标题 + 截断简介
+# （三层降级路径的第一层——见 src/summarize.py 文档字符串）。
+
+provider: deepseek        # deepseek | none
+model: deepseek-v4-flash
+base_url: https://api.deepseek.com/v1
+api_key_env: DEEPSEEK_API_KEY
+timeout_s: 60
+max_output_tokens: 4000

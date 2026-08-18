@@ -1,0 +1,95 @@
+# AI 每日简报 —— 信源清单（v2：离源头更近）
+# 规格来源：daimonia-trends-radar 改造计划 v2
+#
+# v1 用的是 Google News + 36氪 + TechCrunch 这类二手转载/通稿，翻车原因见
+# 计划文档 Context 一节。v2 换成一手数据 API + 一线从业者博客 + 社区原帖，
+# 不再订阅任何新闻媒体。
+#
+# 全部免费、无需 key。每个源独立失败，一个挂了不影响其他源。
+
+# ── 1. GitHub：技术是不是真有人做 ──────────────────────
+# star 时间序列走 collect_github.py + score.py（不改），在 run_daily.py 里
+# 转成标准 item 汇入主候选池。这里只配置 Release 事件采集。
+github_releases:
+  weight: 0.9
+  min_changelog_chars: 80        # changelog 正文短于此视为"fix typo"类，跳过
+  max_per_repo_per_day: 1        # 根治同一仓库连续版本号刷屏（v2.1.233/232/231）
+  fetch_per_repo: 8              # 每个仓库拉取最近几条 release 供实质性过滤挑选
+  watch:
+    - openai/openai-python
+    - anthropics/anthropic-sdk-python
+    - anthropics/claude-code
+    - langchain-ai/langchain
+    - run-llama/llama_index
+    - vllm-project/vllm
+    - huggingface/transformers
+    - ollama/ollama
+    - ggml-org/llama.cpp
+    - astral-sh/uv
+    - astral-sh/ruff
+    - BerriAI/litellm
+    - duckdb/duckdb
+    - pola-rs/polars
+# commits_watch 已删除——"合入某 PR"永远不构成一条值得读的简报。
+
+# ── 2. 一线视角（免费拿不到 X，用个人/实验室博客替代）──────
+blogs:
+  - {name: "Simon Willison",    url: "https://simonwillison.net/atom/everything/", weight: 1.0}
+  - {name: "Lilian Weng",       url: "https://lilianweng.github.io/index.xml",      weight: 1.0}
+  - {name: "Karpathy",          url: "https://karpathy.bearblog.dev/feed/",         weight: 1.0}
+  - {name: "Import AI",         url: "https://importai.substack.com/feed",          weight: 0.9}
+  - {name: "Chip Huyen",        url: "https://huyenchip.com/feed.xml",              weight: 0.9}
+  - {name: "Sebastian Raschka", url: "https://magazine.sebastianraschka.com/feed",  weight: 0.9}
+  - {name: "OpenAI Blog",       url: "https://openai.com/news/rss.xml",             weight: 1.0}
+  - {name: "DeepMind Blog",     url: "https://deepmind.google/blog/rss.xml",        weight: 0.9}
+  - {name: "Google Research",   url: "https://research.google/blog/rss/",           weight: 0.8}
+  - {name: "BAIR Berkeley",     url: "https://bair.berkeley.edu/blog/feed.xml",     weight: 0.8}
+  - {name: "HuggingFace Blog",  url: "https://huggingface.co/blog/feed.xml",        weight: 0.8}
+# 2026-08-18 探活：13/14 通过。Meta AI Blog（HTTP 400）与 LangChain Blog（0 条目）未收录。
+# 跑 scripts/smoke_feeds.py 发现又有源挂了，直接删掉或换地址，不要花时间修。
+
+# ── 3. 社区：用户是不是真买账 ───────────────────────────
+hackernews:
+  url: "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=50"
+  min_points: 200      # 从 150 提到 200，只留真正被讨论起来的
+  weight: 0.8
+
+v2ex:
+  url: "https://www.v2ex.com/index.xml"
+  weight: 0.6
+  # V2EX 是综合程序员论坛，不过滤会灌进大量招聘/装机/生活帖，
+  # 标题命中以下任一关键词才收录（大小写不敏感，子串匹配）。
+  require_keywords:
+    - ai
+    - llm
+    - gpt
+    - claude
+    - 模型
+    - 大模型
+    - agent
+    - rag
+    - 推理
+    - 深度学习
+    - 机器学习
+    - deepseek
+    - qwen
+    - 开源模型
+    - 提示词
+
+# ── 5. 模型生态：生态是不是真成熟 ───────────────────────
+huggingface_api:
+  weight: 1.0
+  trending_models_url:   "https://huggingface.co/api/models?sort=trendingScore&direction=-1&limit=30"
+  daily_papers_url:      "https://huggingface.co/api/daily_papers"
+  trending_datasets_url: "https://huggingface.co/api/datasets?sort=trendingScore&direction=-1&limit=20"
+# ModelScope 未收录：api/v1/models 与 api/v1/dolphin/models 均返回 404（2026-08-18 探活）。
+
+# ── 已删除的信源，理由记在这里防止以后加回来 ──────────────
+# google_news  —— 转载聚合，是"搬运总结"本身；查询词还专门捞融资/收购，
+#                 直接导致要闻区被"高盛谈美联储加息"这类泛财经淹没
+# 36氪 / 少数派 / TechCrunch / The Verge / Ars Technica / InfoQ —— 二手媒体
+#                 报道，36氪快讯尤其混入大量与 AI 无关的泛财经通稿
+# reddit       —— 实测重度限流（5 个子版加 3 秒间隔仍只有 1 个通），
+#                 GitHub Actions 机房 IP 上大概率全挂
+# X / nitter   —— 免费拿不到，官方 API 要钱，Nitter 镜像全部失效
+# ModelScope   —— 两个候选 API 端点均 404

@@ -1,0 +1,147 @@
+# AI 每日简报 —— 新闻打分权重 / 关键词表 / 去重阈值 / 配额（v2）
+# 规格来源：daimonia-trends-radar 改造计划 v2 §四
+#
+# v1 的 business_keywords（融资/收购/IPO/估值/财报 +2.0）是要闻区被泛财经
+# 淹没的直接原因，已删除。v2 反过来用 noise_keywords 惩罚泛财经内容。
+#
+# 修改本文件不需要改代码。
+
+freshness_half_life_hours: 18
+
+# 候选窗口：早于这个小时数的条目直接丢弃，不进打分/去重。
+# 实测发现博客 RSS 会返回整个历史归档（HuggingFace/OpenAI 博客 800+/1100+
+# 条陈年文章），不设窗口会让跨源去重的 O(n^2) 比较明显变慢，而且陈年旧闻
+# 本就不该出现在"今日"简报里。HF trending models/datasets 没有可信的
+# "开始趋势"时间戳，published 留空，不受这个窗口影响（见 collect_hf.py）。
+max_age_hours: 96
+
+dedup:
+  cross_source_jaccard_threshold: 0.55   # 标题 2-gram Jaccard 相似度，超过判定为同一事件
+  cross_day_lookback_days: 7             # 跨天去重回看天数，同时也是 data/seen/ 的保留期
+
+# 配额是上限也是下限：每档先保证至少 1 条（industry 除外，它没有下限，
+# 纯靠内容触发），剩余名额按分数从高到低跨分档补满，直到 total_max。
+# 极端情况下（某天只有一个分档有数据）允许突破多样性上限继续补到
+# total_min，保证"每天至少发这么多条"这条硬约束不被打破。
+quotas:
+  github_max: 4
+  models_max: 3
+  community_max: 3
+  perspective_max: 3
+  industry_max: 2       # 硬上限：泛商业新闻不该占据主要篇幅
+  total_min: 10
+  total_max: 12
+
+# 多样性上限：防止单一来源/单一仓库霸占某个分档
+# （v1 的 bug：claude-code 连发三条补丁版本占满整个工程板块）。
+diversity:
+  max_per_source: 3
+  max_per_repo: 1
+
+# 技术实质关键词：命中越多说明内容越"实"，不是停留在概念/公告层面。
+substance_keywords:
+  weight: 2.0
+  terms:
+    - 开源
+    - open source
+    - benchmark
+    - 论文
+    - paper
+    - 复现
+    - reproduce
+    - 权重
+    - weights
+    - 评测
+    - eval
+    - 数据集
+    - dataset
+    - 推理
+    - inference
+    - 微调
+    - fine-tun
+    - 架构
+    - architecture
+    - 量化
+    - quantiz
+    - 上下文
+    - context
+    - 实测
+    - 基准
+
+# 泛财经噪声：命中就扣分。这不是"AI 相关的商业新闻"（那类走
+# industry_keywords 分类，不在这里），而是纯粹的宏观财经/股市内容——
+# v1 翻车的直接原因（"高盛称美联储加息预测过于激进"混进要闻区）。
+noise_keywords:
+  weight: -4.0
+  terms:
+    - 美联储
+    - 加息
+    - 降息
+    - 股价
+    - 涨停
+    - 跌停
+    - 财报
+    - 营收
+    - 市值
+    - 基金
+    - 券商
+    - 楼市
+    - A股
+    - 港股
+    - 上市辅导
+    - 概念股
+    - 白酒
+    - 减持
+    - 增持
+
+alert_keywords:      # 命中就在邮件里加 ⚠️ 标记（"会弄坏你东西"信号）
+  weight: 4.0
+  terms:
+    - deprecat
+    - breaking change
+    - 涨价
+    - 降价
+    - 退役
+    - sunset
+    - eol
+    - end of life
+    - 定价调整
+    - rate limit
+
+entity_bonus:
+  weight: 1.5
+  terms:
+    - openai
+    - anthropic
+    - deepseek
+    - qwen
+    - llama
+    - mistral
+    - 英伟达
+    - nvidia
+    - claude
+    - gemini
+
+# industry 分档没有专属信源，从 blogs/community 的内容里按这些词筛出来
+# （改造计划 v2 附注一：真正的大事会自然出现在 HN 首页和官方博客上）。
+# 只用于分类归属判断，不参与打分（不设 weight）。
+industry_keywords:
+  terms:
+    - 收购
+    - acquisition
+    - acquire
+    - 融资
+    - funding
+    - ipo
+    - 估值
+    - valuation
+    - 定价
+    - pricing
+    - 涨价
+    - 降价
+    - 裁员
+    - layoff
+    - 上市
+    - 财报
+    - 营收
+    - 季度业绩
